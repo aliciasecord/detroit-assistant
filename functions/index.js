@@ -14,12 +14,16 @@ exports.dialogflowFirebaseFulfillment = functions.https.onRequest((request, resp
   const agent = new WebhookClient({ request, response });
   console.log('Dialogflow Request headers: ' + JSON.stringify(request.headers));
   console.log('Dialogflow Request body: ' + JSON.stringify(request.body));
+
+  // Make it easier to call parameters
   const parameter = request.body.queryResult.parameters;
 
+  // Default welcome agent
   function welcome(agent) {
     agent.add(`Welcome to my agent!`);
   }
 
+  // Default fallback agent
   function fallback(agent) {
     agent.add(`I didn't understand`);
     agent.add(`I'm sorry, can you try again?`);
@@ -28,19 +32,22 @@ exports.dialogflowFirebaseFulfillment = functions.https.onRequest((request, resp
   // Get address from user input
   const address = parameter.short_address;
 
-  // Get the main location for the permits api
+  // This is the url for the permits api
   const permitsurl = `https://data.detroitmi.gov/resource/but4-ky7y.json?$q=`;
 
-  // Call the address API
+  // Fetch the permits API
   function permitssingle(agent){
-    agent.add(`Looking up permits for ${address}`);
-
     fetch(permitsurl + encodeURIComponent(address))
       .then(response => {return response.json()})
       .then(data => {
-          agent.add(`There is ${data.length} permit for that ${address}.`)
+          // Return the number of permit records for that address
+          if (data.length === 1)
+            {agent.add(`There is ${data.length} permit for that ${address}.`)}
+          else {agent.add(`There are ${data.length} permits for that ${address}`)}
+          // then statment has to have a return
           return data.length;
         })
+      // Print something if the above doesn't work
       .catch(agent.add(`I don't know`))
   }
   // Get trash type from user input
@@ -49,16 +56,15 @@ exports.dialogflowFirebaseFulfillment = functions.https.onRequest((request, resp
   // Array to define day of the week
   let weekday = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
-  // Get the location for trash
+  // Get the url for trash API
   const trashurl = 'https://apis.detroitmi.gov/waste_notifier/address/'
 
-  // Sample for trash
+  // Fetch the trash API
   function trashlookup(agent) {
-    agent.add(`Searching for ${trash_type} in ${trashhost + address + '/'}`);
-
     fetch(trashurl + encodeURIComponent(address) + '/')
       .then(response => {return response.json()})
       .then(data => {
+        // Return the date for each type of trash
         if (trash_type === 'trash'){
           let date = new Date(data.next_pickups.trash.date)
         }
@@ -71,13 +77,24 @@ exports.dialogflowFirebaseFulfillment = functions.https.onRequest((request, resp
         else if (trash_type === 'recycling'){
           let date = new Date(data.next_pickups.recycling.date)
         }
+        // Not sure what to do with this else statement
         else
           {return null}
 
+        // Turn date into day of the week
         let day = weekday[date.getDay()]
-        agent.add(`${trash_type} pickup is on ${day}`)
+
+        // return day
         return day
       })
+      .then(day => {
+        // Use day to create response
+        agent.add(`${trash_type} pickup is on ${day}`)
+
+        // then statment has to have a return
+        return day
+      })
+      // Print something if the above doesn't work
       .catch(agent.add(`I'm not sure`));
     }
 
