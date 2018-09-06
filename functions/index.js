@@ -3,17 +3,21 @@
 'use strict';
 
 const functions = require('firebase-functions');
+const fetch = require('node-fetch');
+const https = require('https');
 const {WebhookClient} = require('dialogflow-fulfillment');
 const {Card, Suggestion} = require('dialogflow-fulfillment');
 
 
 process.env.DEBUG = 'dialogflow:debug'; // enables lib debugging statements
 
+const permitshost = 'https://data.detroitmi.gov'
+const trashhost = 'https://apis.detroitmi.gov/waste_notifier/address/'
+
 exports.dialogflowFirebaseFulfillment = functions.https.onRequest((request, response) => {
   const agent = new WebhookClient({ request, response });
   console.log('Dialogflow Request headers: ' + JSON.stringify(request.headers));
   console.log('Dialogflow Request body: ' + JSON.stringify(request.body));
-
   const parameter = request.body.queryResult.parameters;
 
   function welcome(agent) {
@@ -25,10 +29,21 @@ exports.dialogflowFirebaseFulfillment = functions.https.onRequest((request, resp
     agent.add(`I'm sorry, can you try again?`);
   }
 
-  // Single permit lookup
+  // Get address from user input
+  const address = parameter.short_address;
+
+  // Call the address API
   function permitssingle(agent){
-    agent.add(`There are no permits for ${parameter.short_address}`);
+    agent.add(`Looking up permits for ${address}`);
+    singlepermits(address).then((output) => {
+      response.json({ 'fulfillmentMessages': output });// Return the results of the API to Dialogflow
+      return null;
+    }).catch(() => {
+      response.json({ 'fulfillmentMessages': `I don't know` });
+    });
   }
+  // Get trash type from user input
+  const trash_type = parameter.trash_type;
 
   // // Uncomment and edit to make your own intent handler
   // // uncomment `intentMap.set('your intent name here', yourFunctionHandler);`
@@ -48,22 +63,47 @@ exports.dialogflowFirebaseFulfillment = functions.https.onRequest((request, resp
   //   agent.setContext({ name: 'weather', lifespan: 2, parameters: { city: 'Rome' }});
   // }
 
-  // // Uncomment and edit to make your own Google Assistant intent handler
-  // // uncomment `intentMap.set('your intent name here', googleAssistantHandler);`
-  // // below to get this function to be run when a Dialogflow intent is matched
-  // function googleAssistantHandler(agent) {
-  //   let conv = agent.conv(); // Get Actions on Google library conv instance
-  //   conv.ask('Hello from the Actions on Google client library!') // Use Actions on Google library
-  //   agent.add(conv); // Add Actions on Google library responses to your agent's response
-  // }
-  // // See https://github.com/dialogflow/dialogflow-fulfillment-nodejs/tree/master/samples/actions-on-google
-  // // for a complete Dialogflow fulfillment library Actions on Google client library v2 integration sample
 
   // Run the proper function handler based on the matched Dialogflow intent name
   let intentMap = new Map();
   intentMap.set('Default Welcome Intent', welcome);
   intentMap.set('Default Fallback Intent', fallback);
+  intentMap.set('permits.single', permitssingle)
+  intentMap.set('trash', trashlookup);
   // intentMap.set('your intent name here', yourFunctionHandler);
   // intentMap.set('your intent name here', googleAssistantHandler);
   agent.handleRequest(intentMap);
+
 });
+
+function singlepermits(address){
+  return new Promise((resolve, reject) => {
+    // Create the path for the HTTP request to get the permit for a single address
+    let path = '/resource/but4-ky7y.json' + '?$q=' + encodeURIComponent(address);
+    console.log('API request: ' + host + path);
+
+    // Make HTTP request to get the permits
+    https.get(permitshost + path, (res) => {
+      let body = ''; // var to store the response chunks
+      res.on('data', (d) => { body += d; }); // store each response chunk
+      res.on('end', () => {
+        // After all the data has been received parse the JSON for desired data
+        let response = JSON.parse(body);
+        let numberofpermits = response.length;
+
+        // Create response
+        if (numberofpermits === 1)
+          {let output = `There is ${numberofpermits} for that address.`}
+        else
+          {let output = `There are ${numberofpermits} for that address.`}
+
+        // Resolve the promise with the output
+        console.log(output);
+        resolve(output);
+      });
+      res.on('error', (error) => {
+        console.log(`Error calling the permits API: ${error}`)
+      });
+    });
+  });
+}
