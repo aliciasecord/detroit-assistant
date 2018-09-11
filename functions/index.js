@@ -6,7 +6,7 @@
 const {dialogflow} = require('actions-on-google');
 
 // Import the fetch module
-const axios = require('axios');
+const fetch = require('node-fetch');
 
 // Import the firebase-functions package for deployment.
 const functions = require('firebase-functions');
@@ -32,7 +32,7 @@ function singlepermitFunction (conv, {short_address}) {
   // API url for permits at a single address
   const permitsurl = `https://data.detroitmi.gov/resource/but4-ky7y.json?$q=` + encodeURIComponent(short_address);
   // fetch the url
-  axios.get(permitsurl)
+  fetch(permitsurl)
     .then (response => {response.json()})
     .then(data => {
       // Return the number of permits at the address and ask the user how to procede
@@ -60,7 +60,7 @@ app.intent('trash', (conv, {short_address, trash_type}) => {
   const trashurl = 'https://apis.detroitmi.gov/waste_notifier/address/' + encodeURIComponent(short_address) + '/'
 
   // fetch the url
-  axios.get(trashurl)
+  fetch(trashurl)
     .then(response => {return response.json()})
     .then(data => {
       // Return the date for each type of trash
