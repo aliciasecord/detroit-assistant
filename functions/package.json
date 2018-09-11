@@ -21,7 +21,7 @@
     "dialogflow": "^0.1.0",
     "dialogflow-fulfillment": "^0.4.1",
     "firebase-admin": "~6.0.0",
-    "firebase-functions": "^2.0.3",
+    "firebase-functions": "^2.0.5",
     "node-fetch": "^2.2.0"
   },
   "devDependencies": {
